@@ -65,13 +65,22 @@ if [[ ! -f "$config_file" ]]; then
     read -p $'\033[34mConfiguration file not found. Generate configuration template? (Y/n): \033[0m' config_reply
     if ! [[ "$config_reply" == "n" ]]; then
 	cat > "$config_file" <<EOL
+# Set default prompt values below to prefill the interactive prompts (or leave empty)
+# URL of your Thingsboard server
 domain=""
+# Account email
 login_email=""
+# CSV file containing deviceids, labels, names and projects
 csv_file=""
+# tb-batch action to perform: post/delete/get (attributes operations), fetch (download data), inventory (build the CSV file above)
 action=""
+# Scope for the attributes (server or shared)
 scope=""
+# Comma-separated list of projects the target devices are assigned to in the CSV file (add projects manually after building an inventory)
 projects=""
+# Comma-separated list of devices
 labels=""
+# Customer ID hash; this is not the customer name, but the ID that one can copy in the Thingsboard settings from a tenant account
 customerid=""
 EOL
     fi
