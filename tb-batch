@@ -280,7 +280,7 @@ interact() {
 
  	    elif [[ "$action" == "fetch" || "$action" == "f" ]]; then
 	        # Run the fetch.py script with the necessary arguments
-	        echo -e "\033[32m  Fetching data for $label ($deviceid)\033[0m…"
+	        echo -e "\033[36m  $label ($deviceid)\033[0m \033[35m[${project^^}]\033[0m - \033[32mFetching…\033[0m"
 		python3 fetch.py "http://${domain}:8080" -u "${login_email}" -p "${password}" -d "${deviceid}" --project "${project^^}" --label "${label}"
 
 	    fi
