@@ -256,7 +256,7 @@ interact() {
 
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mSuccessfully posted '\033[0m$attribute: $value\033[32m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mPosted '\033[0m$attribute: $value\033[32m'\033[0m"
 		else
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed\033[0m to post '\033[32m$attribute: $value\033[31m' (HTTP Code: $response)\033[0m"
 		fi
@@ -274,7 +274,7 @@ interact() {
 
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mSuccessfully deleted '\033[0m$attribute\033[31m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mDeleted '\033[0m$attribute\033[31m'\033[0m"
 		else
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to delete '\033[0m$attribute\033[31m' (HTTP Code: $response)\033[0m"
 		fi
@@ -292,7 +292,7 @@ interact() {
 		# Print the retrieved attributes in a formatted way
 		if [[ "$response" != "null" && "$response" != "" ]]; then
 		    formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[33m\1\x1b[0m: \x1b[37m\2\x1b[0m/' | awk '{printf "%s; ", $0} END {printf "\n"}' | sed 's/; $//')
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mSuccessfully got current ${scope}_SCOPE attributes:\0033[0m\n      $formatted_attributes"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mCurrent ${scope}_SCOPE attributes:\0033[0m\n      $formatted_attributes"
 		else
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to get ${scope}_SCOPE attributes\033[0m"
 		fi
