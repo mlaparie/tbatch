@@ -11,11 +11,11 @@ show_help() {
     echo "Options:"
     echo "  -d, --domain     ThingsBoard URL domain"
     echo "  -e, --email      Login email"
-    echo "  -pw, --password  Password"
+    echo "  -p, --password  Password"
     echo "  -f, --file       CSV file listing device information (default: deviceids.csv)"
     echo "  -a, --action     Action: post/delete/get (attributes), fetch (data), or inventory (build device csvlist) (default: get)"
     echo "  -s, --scope      Scope of the attributes: server or shared (default: shared)"
-    echo "  -p, --projects   Target project(s) (comma-separated)"
+    echo "  -t, --tags       Target device tag(s) (comma-separated)"
     echo "  -l, --labels     Target device label(s) (comma-separated)"
     echo "  -c, --config     Use custom config file"
     echo "  -o, --once       Run the script once and quit"
@@ -43,11 +43,11 @@ while [[ "$#" -gt 0 ]]; do
     case "$1" in
         -d|--domain) domain="$2"; shift ;;
         -e|--email) login_email="$2"; shift ;;
-        -pw|--password) password="$2"; shift ;;
+        -p|--password) password="$2"; shift ;;
         -f|--file) csv_file="$2"; shift ;;
         -a|--action) action="$2"; shift ;;
         -s|--scope) scope="$2"; shift ;;
-        -p|--projects) project_selection="$2"; shift ;;
+        -t|--tags) tag_selection="$2"; shift ;;
         -l|--labels) label_selection="$2"; shift ;;
 	-o|--once) once="true"; shift ;;
 	-c|--config) config_file="$2"; shift ;;
@@ -66,20 +66,28 @@ if [[ ! -f "$config_file" ]]; then
     if ! [[ "$config_reply" == "n" ]]; then
 	cat > "$config_file" <<EOL
 # Set default prompt values below to prefill the interactive prompts (or leave empty)
+
 # URL of your Thingsboard server
 domain=""
+
 # Account email
 login_email=""
-# CSV file containing deviceids, labels, names and projects
+
+# CSV file containing deviceids, labels, names and tags
 csv_file=""
+
 # tb-batch action to perform: post/delete/get (attributes operations), fetch (download data), inventory (build the CSV file above)
 action=""
+
 # Scope for the attributes (server or shared)
 scope=""
-# Comma-separated list of projects the target devices are assigned to in the CSV file (add projects manually after building an inventory)
-projects=""
+
+# Comma-separated list of tags the target devices are assigned to in the CSV file (add tags manually after building an inventory CSV file)
+tags=""
+
 # Comma-separated list of devices
 labels=""
+
 # Customer ID hash; this is not the customer name, but the ID that one can copy in the Thingsboard settings from a tenant account
 customerid=""
 EOL
@@ -161,7 +169,7 @@ perform_inventory_action() {
       exit 1
   fi
   # Extract device information and save to the CSV file
-  echo "deviceid,name,label,project" > "$csv_file"
+  echo "deviceid,name,label,tag" > "$csv_file"
   echo "$response" | jq -r '.data[] | "\(.id.id),\(.name),\(.label),default"' >> "$csv_file"
   echo -e "\033[32mDevice inventory saved to $csv_file.\033[0m"
 }
@@ -186,17 +194,17 @@ interact() {
       exit 1
   fi
 
-  # Prompt to select projects (if blank, all will be used)
-  if [[ -z "$project_selection" ]] && [[ "$action" != "inventory" && "$action" != "i" ]]; then
-    read -e -p $'\033[34m- List project(s) of the target devices (comma-separated, or leave blank for all projects):\033[0m ' ${defprojects:+-i "$defprojects"} project_selection
+  # Prompt to select tags (if blank, all will be used)
+  if [[ -z "$tag_selection" ]] && [[ "$action" != "inventory" && "$action" != "i" ]]; then
+    read -e -p $'\033[34m- List tag(s) of the target devices (comma-separated, or leave blank):\033[0m ' ${deftags:+-i "$deftags"} tag_selection
   fi
   
-  # Convert project_selection to an array
-  IFS=',' read -r -a selected_projects <<< "$project_selection"
+  # Convert tag_selection to an array
+  IFS=',' read -r -a selected_tags <<< "$tag_selection"
 
   # Prompt to select devices to update (if blank, all will be used)
   if [[ -z "$label_selection" ]] && [[ "$action" != "inventory" && "$action" != "i" ]]; then
-    read -e -p $'\033[34m- List labels of the target devices (comma-separated, or leave blank for all devices):\033[0m ' ${deflabels:+-i "$deflabels"} label_selection
+    read -e -p $'\033[34m- List labels of the target devices (comma-separated, or leave blank):\033[0m ' ${deflabels:+-i "$deflabels"} label_selection
   fi
 
   # Convert label_selection to an array
@@ -221,15 +229,15 @@ interact() {
   fi
 
   # Iterate over each row in the CSV file
-  while IFS=',' read -r deviceid name label project
+  while IFS=',' read -r deviceid name label tag
   do
     # Skip the header if it exists
     if [[ "$deviceid" == "deviceid" ]]; then
       continue
     fi
 
-    # Check if the project is in the selection (or process all if no selection is given)
-    if [[ ${#selected_projects[@]} -eq 0 || " ${selected_projects[@]} " =~ " $project " ]]; then
+    # Check if the tag is in the selection (or process all if no selection is given)
+    if [[ ${#selected_tags[@]} -eq 0 || " ${selected_tags[@]} " =~ " $tag " ]]; then
 
 	# Check if the device label is in the selection (or process all if no selection is given)
 	if [[ ${#selected_labels[@]} -eq 0 || " ${selected_labels[@]} " =~ " $label " ]]; then
@@ -248,9 +256,9 @@ interact() {
 
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${project^^}]\033[0m - \033[32mSuccessfully posted '\033[0m$attribute: $value\033[32m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mSuccessfully posted '\033[0m$attribute: $value\033[32m'\033[0m"
 		else
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${project^^}]\033[0m - \033[31mFailed\033[0m to post '\033[32m$attribute: $value\033[31m' (HTTP Code: $response)\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed\033[0m to post '\033[32m$attribute: $value\033[31m' (HTTP Code: $response)\033[0m"
 		fi
 
 	    elif [[ "$action" == "delete" || "$action" == "d" ]]; then
@@ -266,9 +274,9 @@ interact() {
 
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${project^^}]\033[0m - \033[32mSuccessfully deleted '\033[0m$attribute\033[31m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mSuccessfully deleted '\033[0m$attribute\033[31m'\033[0m"
 		else
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${project^^}]\033[0m - \033[31mFailed to delete '\033[0m$attribute\033[31m' (HTTP Code: $response)\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to delete '\033[0m$attribute\033[31m' (HTTP Code: $response)\033[0m"
 		fi
 
 	    elif [[ "$action" == "get" || "$action" == "g" ]]; then
@@ -284,15 +292,15 @@ interact() {
 		# Print the retrieved attributes in a formatted way
 		if [[ "$response" != "null" && "$response" != "" ]]; then
 		    formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[33m\1\x1b[0m: \x1b[37m\2\x1b[0m/' | awk '{printf "%s; ", $0} END {printf "\n"}' | sed 's/; $//')
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${project^^}]\033[0m - \033[32mSuccessfully got current ${scope}_SCOPE attributes:\0033[0m\n      $formatted_attributes"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mSuccessfully got current ${scope}_SCOPE attributes:\0033[0m\n      $formatted_attributes"
 		else
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${project^^}]\033[0m - \033[31mFailed to get ${scope}_SCOPE attributes\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to get ${scope}_SCOPE attributes\033[0m"
 		fi
 
  	    elif [[ "$action" == "fetch" || "$action" == "f" ]]; then
 	        # Run the fetch.py script with the necessary arguments
-	        echo -e "\033[36m  $label ($deviceid)\033[0m \033[35m[${project^^}]\033[0m - \033[32mFetching…\033[0m"
-		python3 fetch.py "http://${domain}:8080" -u "${login_email}" -p "${password}" -d "${deviceid}" --project "${project^^}" --label "${label}"
+	        echo -e "\033[36m  $label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mFetching…\033[0m"
+		python3 fetch.py "http://${domain}:8080" -u "${login_email}" -p "${password}" -d "${deviceid}" --tag "${tag^^}" --label "${label}"
 
 	    fi
 	fi
@@ -317,7 +325,7 @@ while true; do
       break
     fi
   fi
-  unset project_selection
+  unset tag_selection
   unset label_selection
   unset action
   unset scope
