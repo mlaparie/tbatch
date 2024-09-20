@@ -83,6 +83,8 @@ labels=""
 # Customer ID hash; this is not the customer name, but the ID that one can copy in the Thingsboard settings from a tenant account
 customerid=""
 EOL
+	echo "Configuration template created in '$config_file', go edit it!"
+	exit 0
     fi
 fi
 
