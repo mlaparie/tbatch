@@ -4,7 +4,7 @@ import argparse
 import requests
 import pandas as pd
 import pathlib
-import datetime
+from datetime import datetime, timezone
 
 def login(url, username, password):
     # Log into ThingsBoard
@@ -126,7 +126,15 @@ for device in args.device:
 
     # Show last seen datetime
     if row_count > 1:
-        lastseen = p['utc'].values[0]  # row 2 (index starts from 0)
-        print(f"\n    \033[32mDone: pulled {row_count} rows.\033[0m Last device connection: {lastseen}")
+        now = datetime.now(timezone.utc)  # Get current time as a datetime object
+        last_seen_time = datetime.strptime(p['utc'].values[0], '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+        # Calculate the time difference in hours
+        difference = now - last_seen_time
+        hours, remainder = divmod(difference.total_seconds(), 3600)
+        minutes = remainder // 60
+        lastseen = f"{p['utc'].values[0]} UTC, {int(hours)}h {int(minutes)}m ago."
+        
+        # Print the result
+        print(f"\n    \033[32mDone: pulled {row_count} rows.\033[0m Last seen: {lastseen}")
     else:
-        print(f"\n    \033[32mDone: pulled 0 row.\033[0m")
+        print(f"\n    \033[32mDone: pulled 0 rows.\033[0m")
