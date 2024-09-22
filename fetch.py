@@ -60,10 +60,11 @@ parser.add_argument('--username', '-u', type=str, required=True, help='ThingsBoa
 parser.add_argument('--password', '-p', type=str, required=True, help='ThingsBoard password')
 parser.add_argument('--device', '-d', type=str, required=True, action='append', help='ThingsBoard device id to fetch data of')
 parser.add_argument('--key', '-k', type=str, action='append', help='ThingsBoard device key to fetch')
-parser.add_argument('--label', type=str, required=True, help='Label name used in filename')
-parser.add_argument('--tag', type=str, required=True, help='Tag name used as subdirectory')
 parser.add_argument('--start', type=int, default=0, help='Start time as milisecond UNIX timestamp')
 parser.add_argument('--stop', type=int, default=sys.maxsize, help='Stop time as milisecond UNIX timestamp')
+parser.add_argument('--label', type=str, required=True, help='Label name used in filename')
+parser.add_argument('--tag', type=str, required=True, help='Tag name used as subdirectory')
+parser.add_argument('--output', type=str, default='data', help='Output data folder')
 
 args = parser.parse_args()
 
@@ -115,10 +116,10 @@ for device in args.device:
         p.insert(0, 'utc', pd.to_datetime(p.index, unit='ms', utc=True).strftime('%Y-%m-%d %H:%M:%S'))
     
     # Ensure a directory exists to save the file
-    pathlib.Path(f"./data/{args.tag}").mkdir(parents=True, exist_ok=True)
+    pathlib.Path(f"{args.output}/{args.tag}").mkdir(parents=True, exist_ok=True)
     
-    # Save the DataFrame to a CSV file
-    output_file = f"./data/{args.tag}/{args.label}-{device}.csv"
+    # Save the dataFrame to a CSV file
+    output_file = f"{args.output}/{args.tag}/{args.label}-{device}.csv"
     p.to_csv(output_file)
 
     # Get the number of rows in the CSV file

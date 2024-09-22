@@ -9,19 +9,20 @@ show_help() {
     echo "Usage: $0 [options]"
     echo ""
     echo "Options:"
-    echo "  -d, --domain       ThingsBoard URL domain"
-    echo "  -e, --email        Login email"
-    echo "  -p, --password     Password"
-    echo "  -f, --file         CSV file listing device information (default: deviceids.csv)"
-    echo "  -a, --action       Action: post/delete/get (attributes), fetch (data), or inventory (build device CSV list) (default: get)"
-    echo '  -t, --tags         Target device tag(s) (comma-separated, or "*")'
-    echo '  -l, --labels       Target device label(s) (comma-separated, or "*")'
-    echo "  -s, --scope        Scope of the target attribute: server or shared (default: shared)"
-    echo "  -att, --attribute  Attribute name (for post/delete actions)"
-    echo "  -v, --value        New attribute value (for post action)"
-    echo "  -c, --config       Use custom config file"
-    echo "  -o, --once         Run once and quit instead of prompting for new actions (only place this flag at the end of the command)"
-    echo "  -h, --help         Show this help and exit"
+    echo "  -d, --domain DOMAIN      ThingsBoard URL domain"
+    echo "  -e, --email EMAIL        Login email"
+    echo "  -p, --password PASSWORD  Password"
+    echo "  -f, --file FILE          CSV file listing device information (default: deviceids.csv)"
+    echo "  -a, --action ACTION      Action: post/delete/get (attributes), fetch (data), or inventory (build device CSV list) (default: get)"
+    echo '  -t, --tags TAG(S)        Target device tag(s) (comma-separated, or "*")'
+    echo '  -l, --labels LABEL(S)    Target device label(s) (comma-separated, or "*")'
+    echo "  -s, --scope SCOPE        Scope of the target attribute: server or shared (default: shared)"
+    echo "  -k, --key KEY            Target attribute key name (for post/delete actions)"
+    echo "  -v, --value VALUE        New value for target attribute (for post action)"
+    echo "  -o, --output FOLDER      Output folder for fetched data (default: ./data/)"
+    echo "  -c, --config FILE        Use custom config file"
+    echo "  -q, --quit               Run once then quit instead of prompting for new actions (only place this flag at the end of the command)"
+    echo "  -h, --help               Show this help and exit"
     echo ""
     echo "Dependencies: curl, jq, python3, python3-pandas"
 }
@@ -51,10 +52,11 @@ while [[ "$#" -gt 0 ]]; do
         -t|--tags|--tag) tag_selection="$2"; shift ;;
         -l|--labels|--label) label_selection="$2"; shift ;;
         -s|--scope) scope="$2"; shift ;;
-	-att|--attribute) attribute="$2"; shift ;;
+	-k|--key) key="$2"; shift ;;
 	-v|--value) value="$2"; shift ;;
+	-o|--output) output="$2"; shift ;;
 	-c|--config) config_file="$2"; shift ;;
-	-o|--once) once="true"; shift ;;
+	-q|--quit) quit="true"; shift ;;
 	-h|--help) show_help; exit 0 ;;
         *) echo "Unknown option: $1"; show_help; exit 1 ;;
     esac
@@ -62,7 +64,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # Read config file, if any
-config_file=${config_file:-tb-batch.conf}
+config_file=${config_file:-tbatch.conf}
 
 # Check if the configuration file exists
 if [[ ! -f "$config_file" ]]; then
@@ -82,7 +84,7 @@ login_email=""
 # CSV file containing deviceids, labels, names and tags
 csv_file=""
 
-# tb-batch action to perform: post/delete/get (attributes operations), fetch (download data), inventory (build the CSV file above)
+# tbatch action to perform: post/delete/get (attributes operations), fetch (download data), inventory (build the CSV file above)
 action=""
 
 # Scope for the attributes: server or shared
@@ -98,13 +100,13 @@ labels=""
 # Customer ID hash; this is not the customer name, but the ID that one can copy in the Thingsboard settings from a tenant account
 customerid=""
 
-# Run the script once and exit: y/n
-once=""
+# Run the script once and quit: y/n
+quit=""
 
-# Attribute name (for post/delete actions)
-attribute=""
+# Target attribute key name (for post/delete actions)
+key=""
 
-# New attribute value (for post action)
+# New value for target attribute (for post action)
 value=""
 EOL
 	echo "Configuration template created in '$config_file', go edit it!"
@@ -113,18 +115,18 @@ EOL
 fi
 
 # Source the config file and prefix variables with "def"
-while IFS='=' read -r key val; do
+while IFS='=' read -r confkey val; do
     # Skip comments and empty lines
-    if [[ "$key" =~ ^#.* ]] || [[ -z "$key" ]]; then
+    if [[ "$confkey" =~ ^#.* ]] || [[ -z "$confkey" ]]; then
         continue
     fi
 
-    # Remove leading and trailing spaces from the key and value
-    key=$(echo "$key" | xargs)
+    # Remove leading and trailing spaces from the confkey and value
+    confkey=$(echo "$confkey" | xargs)
     val=$(echo "$val" | xargs)
 
     # Prepend "def" to the variable name
-    defvar="def${key}"
+    defvar="def${confkey}"
 
     # Only set the variable if the value is not empty
     if [[ -n "$val" ]]; then
@@ -256,16 +258,16 @@ interact() {
 
   if [[ "$action" == "post" || "$action" == "p" ]]; then
     # Prompt for attribute and value for post action
-      if [[ -z "$attribute" ]]; then
-	  read -e -p $'\033[34m  Attribute name:\033[0m ' ${defattribute:+-i "$defattribute"} attribute
+      if [[ -z "$key" ]]; then
+	  read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} attribute
       fi
       if [[ -z "$value" ]]; then
-	  read -e -p $'\033[34m  New attribute value:\033[0m ' ${defvalue:+-i "$defvalue"} value
+	  read -e -p $'\033[34m  New value for target attribute:\033[0m ' ${defvalue:+-i "$defvalue"} value
       fi
   elif [[ "$action" == "delete" || "$action" == "d" ]]; then
-    # Prompt for attribute name for delete action
-      if [[ -z "$attribute" ]]; then
-	  read -e -p $'\033[34m  Attribute name:\033[0m ' ${defattribute:+-i "$defattribute"} attribute
+    # Prompt for attribute key name for delete action
+      if [[ -z "$key" ]]; then
+	  read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} attribute
       fi
   fi
 
@@ -293,18 +295,18 @@ interact() {
 				-H "accept: application/json" \
 				-H "Content-Type: application/json" \
 				-H "X-Authorization: Bearer ${AUTH_TOKEN}" \
-				-d "{\"${attribute}\": ${value}}")
+				-d "{\"${key}\": ${value}}")
 
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mPosted '\033[0m$attribute: $value\033[32m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mPosted '\033[0m$key: $value\033[32m'\033[0m"
 		else
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed\033[0m to post '\033[32m$attribute: $value\033[31m' (HTTP Code: $response)\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed\033[0m to post '\033[32m$key: $value\033[31m' (HTTP Code: $response)\033[0m"
 		fi
 
 	    elif [[ "$action" == "delete" || "$action" == "d" ]]; then
 		# Build the DELETE URL
-		delete_url="https://${domain}:443/api/plugins/telemetry/$deviceid/${scope}_SCOPE?keys=$attribute"
+		delete_url="https://${domain}:443/api/plugins/telemetry/$deviceid/${scope}_SCOPE?keys=$key"
 
 		# Make the DELETE request
 		response=$(curl -X 'DELETE' \
@@ -315,9 +317,9 @@ interact() {
 
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mDeleted '\033[0m$attribute\033[31m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mDeleted '\033[0m$key\033[31m'\033[0m"
 		else
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to delete '\033[0m$attribute\033[31m' (HTTP Code: $response)\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to delete '\033[0m$key\033[31m' (HTTP Code: $response)\033[0m"
 		fi
 
 	    elif [[ "$action" == "get" || "$action" == "g" ]]; then
@@ -339,9 +341,11 @@ interact() {
 		fi
 
  	    elif [[ "$action" == "fetch" || "$action" == "f" ]]; then
+		# Check if an output folder was set
+		output=${output:-data}
 	        # Run the fetch.py script with the necessary arguments
-	        echo -e "\033[36m  $label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mFetching…\033[0m"
-		python3 fetch.py "http://${domain}:8080" -u "${login_email}" -p "${password}" -d "${deviceid}" --tag "${tag^^}" --label "${label}"
+	        echo -e "\033[36m  $label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mFetching to ${output}/…\033[0m"
+		python3 fetch.py "http://${domain}:8080" -u "${login_email}" -p "${password}" -d "${deviceid}" --output "${output}" --tag "${tag^^}" --label "${label}"
 
 	    fi
 	fi
@@ -359,8 +363,8 @@ while true; do
   interact
 
   # Prompt user to continue or exit
-  if [[ -z "$once" ]]; then
-    read -e -p $'\033[34m- Continue with other device(s) and attribute(s)? (Y/n):\033[0m ' ${defonce:+-i "$defonce"} continue_choice
+  if [[ -z "$quit" ]]; then
+    read -e -p $'\033[34m- Execute a new action? (Y/n):\033[0m ' ${defquit:+-i "$defquit"} continue_choice
     if [[ "$continue_choice" = "n" ]]; then
       echo "Exiting…"
       exit 0
