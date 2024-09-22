@@ -93,7 +93,7 @@ for device in args.device:
         # Iterate over keys and fetch data
         for i, key in enumerate(keys):
             # Prepare the key string and comma handling
-            key_str = f"\033[33m{key}\033[0m"
+            key_str = f"{key}"
             is_last_key = i == len(keys) - 1
             comma = "," if not is_last_key else ""  # Add a comma unless it's the last key
             key_length = len(key_str) + len(comma)
@@ -136,6 +136,6 @@ for device in args.device:
         lastseen = f"{p['utc'].values[0]} UTC, {int(hours)}h {int(minutes)}m ago."
         
         # Print the result
-        print(f"\n    \033[32mDone: pulled {row_count} rows.\033[0m Last seen: {lastseen}")
+        print(f"\n    \033[32mDone: pulled {row_count} rows.\033[0m \033[33mLast seen: {lastseen}\033[0m")
     else:
         print(f"\n    \033[32mDone: pulled 0 rows.\033[0m")

@@ -259,7 +259,7 @@ interact() {
   if [[ "$action" == "post" || "$action" == "p" ]]; then
     # Prompt for attribute and value for post action
       if [[ -z "$key" ]]; then
-	  read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} attribute
+	  read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} key
       fi
       if [[ -z "$value" ]]; then
 	  read -e -p $'\033[34m  New value for target attribute:\033[0m ' ${defvalue:+-i "$defvalue"} value
@@ -267,7 +267,7 @@ interact() {
   elif [[ "$action" == "delete" || "$action" == "d" ]]; then
     # Prompt for attribute key name for delete action
       if [[ -z "$key" ]]; then
-	  read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} attribute
+	  read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} key
       fi
   fi
 
@@ -334,7 +334,7 @@ interact() {
 
 		# Print the retrieved attributes in a formatted way
 		if [[ "$response" != "null" && "$response" != "" ]]; then
-		    formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[33m\1\x1b[0m: \x1b[37m\2\x1b[0m/' | awk '{printf "%s; ", $0} END {printf "\n"}' | sed 's/; $//')
+		    formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[37m\1\x1b[0m: \x1b[33m\2\x1b[0m/' | awk '{printf "%s; ", $0} END {printf "\n"}' | sed 's/; $//')
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mCurrent ${scope}_SCOPE attributes:\0033[0m\n      $formatted_attributes"
 		else
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to get ${scope}_SCOPE attributes\033[0m"
