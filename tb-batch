@@ -66,8 +66,10 @@ if [[ ! -f "$config_file" ]]; then
     if ! [[ "$config_reply" == "n" ]]; then
 	cat > "$config_file" <<EOL
 # Set default prompt values below to prefill the interactive prompts (or leave empty)
+# This configuration is ignored when running the script non-interctively, but all
+# options below can be set at runtime with flags.
 
-# URL of your Thingsboard server
+# URL of your Thingsboard server, i.e., example.com
 domain=""
 
 # Account email
@@ -79,7 +81,7 @@ csv_file=""
 # tb-batch action to perform: post/delete/get (attributes operations), fetch (download data), inventory (build the CSV file above)
 action=""
 
-# Scope for the attributes (server or shared)
+# Scope for the attributes: server or shared
 scope=""
 
 # Comma-separated list of tags the target devices are assigned to in the CSV file (add tags manually after building an inventory CSV file)
@@ -90,6 +92,9 @@ labels=""
 
 # Customer ID hash; this is not the customer name, but the ID that one can copy in the Thingsboard settings from a tenant account
 customerid=""
+
+# Run the script once and exit: y/n
+once=""
 EOL
 	echo "Configuration template created in '$config_file', go edit it!"
 	exit 0
@@ -117,8 +122,15 @@ while IFS='=' read -r key value; do
 done < "$config_file"
 
 # Check if csv_file was set at run time, else read from config.file, and if empty, replace by default value
+# and if that file doesn't exist, offer to generate one
 if [[ -z "$csv_file" ]]; then
     csv_file=${defcsv_file:-deviceids.csv}
+    if [[ ! -f "$csv_file" ]]; then
+      read -p $'\033[34mFile listing device IDs not found. Try to generate one? (Y/n): \033[0m' csv_reply
+      if ! [[ "$csv_reply" == "n" ]]; then
+	action="inventory"
+      fi
+    fi
 fi
 
 # Credentials prompts
@@ -157,23 +169,27 @@ perform_inventory_action() {
           exit 0
       fi
   fi
-  # Perform the GET request to retrieve the inventory of devices
+  # Set customer ID, required for this action
   read -e -p $'\033[34m- Enter your customer ID:\033[0m ' ${defcustomerid:+-i "$defcustomerid"} userid
-  response=$(curl -s -X GET \
-      "https://${domain}:443/api/customer/${userid}/devices?pageSize=100&page=0&textSearch=FG&sortProperty=label&sortOrder=ASC" \
-      -H "accept: application/json" \
-      -H "X-Authorization: Bearer ${AUTH_TOKEN}")
-  # Check if the response contains an error
-  if [[ -z "$response" || "$response" == "null" ]]; then
-      echo -e "\033[31mFailed to retrieve devices. Please check that you used a valid customer ID, not a customer name.\033[0m"
-      exit 1
-  fi
-  # Extract device information and save to the CSV file
-  echo "deviceid,name,label,tag" > "$csv_file"
-  echo "$response" | jq -r '.data[] | "\(.id.id),\(.name),\(.label),default"' >> "$csv_file"
-  echo -e "\033[32mDevice inventory saved to $csv_file.\033[0m"
-}
 
+  # Print results based on HTTP response
+  # Build the GET URL
+  get_url="https://${domain}:443/api/customer/${userid}/devices?pageSize=100&page=0&textSearch=FG&sortProperty=label&sortOrder=ASC"
+  
+  # Execute the curl command for post
+  response=$(curl -s -w "%{http_code}" -X GET \
+		  "$get_url" \
+		  -H "accept: application/json" \
+		  -H "X-Authorization: Bearer ${AUTH_TOKEN}")
+  if [[ "${response: -3}" == "200" ]]; then
+    echo "${response::-3}" | jq -r '.data[] | "\(.id.id),\(.name),\(.label),default"' > "$csv_file"
+    echo -e "deviceid,name,label,tag\n$(cat $csv_file)" > "$csv_file"
+    echo -e "\033[32mDevice inventory saved to $csv_file.\033[0m"
+  else
+    echo -e "\033[31mFailed to retrieve devices (HTTP code: ${response: -3}). Please check that you used a valid customer ID, not a customer name.\033[0m"
+    exit 1   
+  fi
+}
 
 # Function to process the device updates
 interact() {
@@ -319,7 +335,7 @@ while true; do
 
   # Prompt user to continue or exit
   if [[ -z "$once" ]]; then
-    read -p $'\033[34m- Continue with other device(s) and attribute(s)? (Y/n): \033[0m' continue_choice
+    read -e -p $'\033[34m- Continue with other device(s) and attribute(s)? (Y/n):\033[0m ' ${defonce:+-i "$defonce"} continue_choice
     if [[ "$continue_choice" = "n" ]]; then
       echo "Exiting…"
       break
