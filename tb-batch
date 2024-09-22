@@ -125,11 +125,11 @@ done < "$config_file"
 # and if that file doesn't exist, offer to generate one
 if [[ -z "$csv_file" ]]; then
     csv_file=${defcsv_file:-deviceids.csv}
-    if [[ ! -f "$csv_file" ]]; then
-      read -p $'\033[34mFile listing device IDs not found. Try to generate one? (Y/n): \033[0m' csv_reply
-      if ! [[ "$csv_reply" == "n" ]]; then
+fi
+if [[ ! -f "$csv_file" ]]; then
+    read -p $'\033[34mFile listing device IDs not found. Try to generate one? (Y/n): \033[0m' csv_reply
+    if ! [[ "$csv_reply" == "n" ]]; then
 	action="inventory"
-      fi
     fi
 fi
 
