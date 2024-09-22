@@ -9,17 +9,19 @@ show_help() {
     echo "Usage: $0 [options]"
     echo ""
     echo "Options:"
-    echo "  -d, --domain     ThingsBoard URL domain"
-    echo "  -e, --email      Login email"
-    echo "  -p, --password  Password"
-    echo "  -f, --file       CSV file listing device information (default: deviceids.csv)"
-    echo "  -a, --action     Action: post/delete/get (attributes), fetch (data), or inventory (build device csvlist) (default: get)"
-    echo "  -s, --scope      Scope of the attributes: server or shared (default: shared)"
-    echo "  -t, --tags       Target device tag(s) (comma-separated)"
-    echo "  -l, --labels     Target device label(s) (comma-separated)"
-    echo "  -c, --config     Use custom config file"
-    echo "  -o, --once       Run the script once and quit"
-    echo "  -h, --help       Display this help and exit"
+    echo "  -d, --domain      ThingsBoard URL domain"
+    echo "  -e, --email       Login email"
+    echo "  -p, --password    Password"
+    echo "  -f, --file        CSV file listing device information (default: deviceids.csv)"
+    echo "  -a, --action      Action: post/delete/get (attributes), fetch (data), or inventory (build device csvlist) (default: get)"
+    echo "  -s, --scope       Scope of the attributes: server or shared (default: shared)"
+    echo "  -t, --tags        Target device tag(s) (comma-separated)"
+    echo "  -l, --labels      Target device label(s) (comma-separated)"
+    echo "  -c, --config      Use custom config file"
+    echo "  -att, --attribute Attribute name (for post/delete actions)"
+    echo "  -v, --value       New attribute value (for post action)"
+    echo "  -o, --once        Run the script once and quit"
+    echo "  -h, --help        Display this help and exit"
     echo ""
     echo "Dependencies: curl, jq, python3, python3-pandas"
 }
@@ -41,20 +43,70 @@ check_dependencies
 # Read CLI flags
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
-        -d|--domain) domain="$2"; shift ;;
-        -e|--email) login_email="$2"; shift ;;
-        -p|--password) password="$2"; shift ;;
-        -f|--file) csv_file="$2"; shift ;;
-        -a|--action) action="$2"; shift ;;
-        -s|--scope) scope="$2"; shift ;;
-        -t|--tags) tag_selection="$2"; shift ;;
-        -l|--labels) label_selection="$2"; shift ;;
-	-o|--once) once="true"; shift ;;
-	-c|--config) config_file="$2"; shift ;;
-	-h|--help) show_help; exit 0 ;;
-        *) echo "Unknown option: $1"; show_help; exit 1 ;;
+        -d|--domain)
+            domain="$2"
+            shift 2
+            ;;
+        -e|--email)
+            login_email="$2"
+            shift 2
+            ;;
+        -p|--password)
+            password="$2"
+            shift 2
+            ;;
+        -f|--file)
+            csv_file="$2"
+            shift 2
+            ;;
+        -a|--action)
+            action="$2"
+            shift 2
+            ;;
+        -s|--scope)
+            scope="$2"
+            shift 2
+            ;;
+        -t|--tags)
+            tag_selection="$2"
+            shift 2
+            ;;
+        -l|--labels)
+            # Handle empty value explicitly
+            if [[ -n "${2+x}" ]]; then
+                label_selection="$2"
+                shift 2
+            else
+                label_selection=""
+                shift
+            fi
+            ;;
+        -o|--once)
+            once="true"
+            shift
+            ;;
+        -c|--config)
+            config_file="$2"
+            shift 2
+            ;;
+        -att|--attribute)
+            attribute="$2"
+            shift 2
+            ;;
+        -v|--value)
+            value="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
     esac
-    shift
 done
 
 # Read config file, if any
@@ -95,6 +147,12 @@ customerid=""
 
 # Run the script once and exit: y/n
 once=""
+
+# Attribute name (for post/delete actions)
+attribute=""
+
+# New attribute value (for post action)
+value=""
 EOL
 	echo "Configuration template created in '$config_file', go edit it!"
 	exit 0
@@ -237,8 +295,8 @@ interact() {
 
   if [[ "$action" == "post" || "$action" == "p" ]]; then
     # Prompt for attribute and value for post action
-    read -p $'\033[34m  Attribute name:\033[0m ' attribute
-    read -p $'\033[34m  New attribute value:\033[0m ' value
+    read -e -p $'\033[34m  Attribute name:\033[0m ' ${defattribute:+-i "$defattribute"} attribute
+    read -e -p $'\033[34m  New attribute value:\033[0m ' ${defvaluee:+-i "$devalue"} value
   elif [[ "$action" == "delete" || "$action" == "d" ]]; then
     # Prompt for attribute name for delete action
     read -p $'\033[34m  Attribute name:\033[0m ' attribute
@@ -338,12 +396,14 @@ while true; do
     read -e -p $'\033[34m- Continue with other device(s) and attribute(s)? (Y/n):\033[0m ' ${defonce:+-i "$defonce"} continue_choice
     if [[ "$continue_choice" = "n" ]]; then
       echo "Exiting…"
-      break
+      exit 0
     fi
+    unset tag_selection
+    unset label_selection
+    unset action
+    unset scope
+  else
+    exit 0
   fi
-  unset tag_selection
-  unset label_selection
-  unset action
-  unset scope
 done
 
