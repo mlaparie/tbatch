@@ -110,6 +110,10 @@ for device in args.device:
             # Fetch data for the key
             p = pd.concat([p, get_data(args.url, token, device, key, args.start, args.stop)], axis=1)
 
+    # Add a new column for the UTC timestamp
+    if not p.empty:
+        p.insert(0, 'utc', pd.to_datetime(p.index, unit='ms', utc=True).strftime('%Y-%m-%d %H:%M:%S'))
+    
     # Ensure a directory exists to save the file
     pathlib.Path(f"./data/{args.tag}").mkdir(parents=True, exist_ok=True)
     
@@ -120,10 +124,9 @@ for device in args.device:
     # Get the number of rows in the CSV file
     row_count = len(p)
 
-    # Convert the value at row 2, column 1 (assuming index 'ts' is the first column)
+    # Show last seen datetime
     if row_count > 1:
-        timestamp = p.index[1]  # row 2 (index starts from 0)
-        converted_time = datetime.datetime.fromtimestamp(timestamp / 1000, datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')
-        print(f"\n    \033[32mDone: pulled {row_count} rows.\033[0m Last device connection: {converted_time}")
+        lastseen = p['utc'].values[0]  # row 2 (index starts from 0)
+        print(f"\n    \033[32mDone: pulled {row_count} rows.\033[0m Last device connection: {lastseen}")
     else:
         print(f"\n    \033[32mDone: pulled 0 row.\033[0m")
