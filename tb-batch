@@ -9,19 +9,19 @@ show_help() {
     echo "Usage: $0 [options]"
     echo ""
     echo "Options:"
-    echo "  -d, --domain      ThingsBoard URL domain"
-    echo "  -e, --email       Login email"
-    echo "  -p, --password    Password"
-    echo "  -f, --file        CSV file listing device information (default: deviceids.csv)"
-    echo "  -a, --action      Action: post/delete/get (attributes), fetch (data), or inventory (build device csvlist) (default: get)"
-    echo "  -s, --scope       Scope of the attributes: server or shared (default: shared)"
-    echo "  -t, --tags        Target device tag(s) (comma-separated)"
-    echo "  -l, --labels      Target device label(s) (comma-separated)"
-    echo "  -c, --config      Use custom config file"
-    echo "  -att, --attribute Attribute name (for post/delete actions)"
-    echo "  -v, --value       New attribute value (for post action)"
-    echo "  -o, --once        Run the script once and quit"
-    echo "  -h, --help        Display this help and exit"
+    echo "  -d, --domain       ThingsBoard URL domain"
+    echo "  -e, --email        Login email"
+    echo "  -p, --password     Password"
+    echo "  -f, --file         CSV file listing device information (default: deviceids.csv)"
+    echo "  -a, --action       Action: post/delete/get (attributes), fetch (data), or inventory (build device CSV list) (default: get)"
+    echo '  -t, --tags         Target device tag(s) (comma-separated, or "*")'
+    echo '  -l, --labels       Target device label(s) (comma-separated, or "*")'
+    echo "  -s, --scope        Scope of the target attribute: server or shared (default: shared)"
+    echo "  -att, --attribute  Attribute name (for post/delete actions)"
+    echo "  -v, --value        New attribute value (for post action)"
+    echo "  -c, --config       Use custom config file"
+    echo "  -o, --once         Run once and quit instead of prompting for new actions (only place this flag at the end of the command)"
+    echo "  -h, --help         Show this help and exit"
     echo ""
     echo "Dependencies: curl, jq, python3, python3-pandas"
 }
@@ -43,70 +43,22 @@ check_dependencies
 # Read CLI flags
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
-        -d|--domain)
-            domain="$2"
-            shift 2
-            ;;
-        -e|--email)
-            login_email="$2"
-            shift 2
-            ;;
-        -p|--password)
-            password="$2"
-            shift 2
-            ;;
-        -f|--file)
-            csv_file="$2"
-            shift 2
-            ;;
-        -a|--action)
-            action="$2"
-            shift 2
-            ;;
-        -s|--scope)
-            scope="$2"
-            shift 2
-            ;;
-        -t|--tags)
-            tag_selection="$2"
-            shift 2
-            ;;
-        -l|--labels)
-            # Handle empty value explicitly
-            if [[ -n "${2+x}" ]]; then
-                label_selection="$2"
-                shift 2
-            else
-                label_selection=""
-                shift
-            fi
-            ;;
-        -o|--once)
-            once="true"
-            shift
-            ;;
-        -c|--config)
-            config_file="$2"
-            shift 2
-            ;;
-        -att|--attribute)
-            attribute="$2"
-            shift 2
-            ;;
-        -v|--value)
-            value="$2"
-            shift 2
-            ;;
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            show_help
-            exit 1
-            ;;
+        -d|--domain) domain="$2"; shift ;;
+        -e|--email) login_email="$2"; shift ;;
+        -p|--password) password="$2"; shift ;;
+        -f|--file) csv_file="$2"; shift ;;
+        -a|--action) action="$2"; shift ;;
+        -t|--tags|--tag) tag_selection="$2"; shift ;;
+        -l|--labels|--label) label_selection="$2"; shift ;;
+        -s|--scope) scope="$2"; shift ;;
+	-att|--attribute) attribute="$2"; shift ;;
+	-v|--value) value="$2"; shift ;;
+	-c|--config) config_file="$2"; shift ;;
+	-o|--once) once="true"; shift ;;
+	-h|--help) show_help; exit 0 ;;
+        *) echo "Unknown option: $1"; show_help; exit 1 ;;
     esac
+    shift
 done
 
 # Read config file, if any
@@ -137,9 +89,10 @@ action=""
 scope=""
 
 # Comma-separated list of tags the target devices are assigned to in the CSV file (add tags manually after building an inventory CSV file)
+# (do not use "*" for wild card, this is only supported with the --tags flag at runtime)
 tags=""
 
-# Comma-separated list of devices
+# Comma-separated list of devices (do not use "*" for wild card, this is only supported with the --labels flag at runtime)
 labels=""
 
 # Customer ID hash; this is not the customer name, but the ID that one can copy in the Thingsboard settings from a tenant account
@@ -160,7 +113,7 @@ EOL
 fi
 
 # Source the config file and prefix variables with "def"
-while IFS='=' read -r key value; do
+while IFS='=' read -r key val; do
     # Skip comments and empty lines
     if [[ "$key" =~ ^#.* ]] || [[ -z "$key" ]]; then
         continue
@@ -168,14 +121,14 @@ while IFS='=' read -r key value; do
 
     # Remove leading and trailing spaces from the key and value
     key=$(echo "$key" | xargs)
-    value=$(echo "$value" | xargs)
+    val=$(echo "$val" | xargs)
 
     # Prepend "def" to the variable name
     defvar="def${key}"
 
     # Only set the variable if the value is not empty
-    if [[ -n "$value" ]]; then
-        eval "$defvar='$value'"
+    if [[ -n "$val" ]]; then
+        eval "$defvar='$val'"
     fi
 done < "$config_file"
 
@@ -268,17 +221,25 @@ interact() {
       exit 1
   fi
 
-  # Prompt to select tags (if blank, all will be used)
-  if [[ -z "$tag_selection" ]] && [[ "$action" != "inventory" && "$action" != "i" ]]; then
-    read -e -p $'\033[34m- List tag(s) of the target devices (comma-separated, or leave blank):\033[0m ' ${deftags:+-i "$deftags"} tag_selection
+  # Prompt to select tags (if blank or *, all will be used)
+  if [[ -z "$tag_selection" || "$tag_selection" == "*" ]] && [[ "$action" != "inventory" && "$action" != "i" ]]; then
+    if [[ "$tag_selection" != "*" ]]; then
+	read -e -p $'\033[34m- List tag(s) of the target devices (comma-separated, or leave blank):\033[0m ' ${deftags:+-i "$deftags"} tag_selection
+    else
+	tag_selection=""
+    fi
   fi
   
   # Convert tag_selection to an array
   IFS=',' read -r -a selected_tags <<< "$tag_selection"
 
-  # Prompt to select devices to update (if blank, all will be used)
-  if [[ -z "$label_selection" ]] && [[ "$action" != "inventory" && "$action" != "i" ]]; then
-    read -e -p $'\033[34m- List labels of the target devices (comma-separated, or leave blank):\033[0m ' ${deflabels:+-i "$deflabels"} label_selection
+  # Prompt to select devices to update (if blank or *, all will be used)
+  if [[ -z "$label_selection" || "$label_selection" == "*" ]] && [[ "$action" != "inventory" && "$action" != "i" ]]; then
+    if [[ "$label_selection" != "*" ]]; then
+	read -e -p $'\033[34m- List labels of the target devices (comma-separated, or leave blank):\033[0m ' ${deflabels:+-i "$deflabels"} label_selection
+    else
+	label_selection=""
+    fi
   fi
 
   # Convert label_selection to an array
@@ -295,11 +256,17 @@ interact() {
 
   if [[ "$action" == "post" || "$action" == "p" ]]; then
     # Prompt for attribute and value for post action
-    read -e -p $'\033[34m  Attribute name:\033[0m ' ${defattribute:+-i "$defattribute"} attribute
-    read -e -p $'\033[34m  New attribute value:\033[0m ' ${defvaluee:+-i "$devalue"} value
+      if [[ -z "$attribute" ]]; then
+	  read -e -p $'\033[34m  Attribute name:\033[0m ' ${defattribute:+-i "$defattribute"} attribute
+      fi
+      if [[ -z "$value" ]]; then
+	  read -e -p $'\033[34m  New attribute value:\033[0m ' ${defvalue:+-i "$defvalue"} value
+      fi
   elif [[ "$action" == "delete" || "$action" == "d" ]]; then
     # Prompt for attribute name for delete action
-    read -p $'\033[34m  Attribute name:\033[0m ' attribute
+      if [[ -z "$attribute" ]]; then
+	  read -e -p $'\033[34m  Attribute name:\033[0m ' ${defattribute:+-i "$defattribute"} attribute
+      fi
   fi
 
   # Iterate over each row in the CSV file
