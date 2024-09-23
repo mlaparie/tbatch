@@ -103,7 +103,7 @@ customerid=""
 # Run the script once and quit: y/n
 quit=""
 
-# Target attribute key name (for post/delete actions)
+# Target attribute key name (for post/delete/get actions)
 key=""
 
 # New value for target attribute (for post action)
@@ -247,28 +247,25 @@ interact() {
   # Convert label_selection to an array
   IFS=',' read -r -a selected_labels <<< "$label_selection"
 
-  if [[ "$action" != "fetch" && "$action" != "f" ]]; then
+  if [[ "$action" != "fetch" && "$action" != "f" && "$action" != "inventory" && "$action" != "i" ]]; then
     # Get the scope
-      if [[ -z "$scope" ]] && [[ "$action" != "inventory" && "$action" != "i" ]]; then
+      if [[ -z "$scope" ]]; then
 	read -e -p $'\033[34m- Set scope (server/shared; default: shared):\033[0m ' ${defscope:+-i "$defscope"} scope
       fi
       scope=${scope:-SHARED}
       scope=${scope^^}
   fi
 
-  if [[ "$action" == "post" || "$action" == "p" ]]; then
+  if [[ "$action" != "inventory" && "$action" != "i" && "$action" != "fetch" && "$action" != "f" ]]; then
     # Prompt for attribute and value for post action
-      if [[ -z "$key" ]]; then
-	  read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} key
-      fi
+    if [[ -z "$key" ]]; then
+      read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} key
+    fi
+    if [[ "$action" == "post" || "$action" == "p" ]]; then
       if [[ -z "$value" ]]; then
-	  read -e -p $'\033[34m  New value for target attribute:\033[0m ' ${defvalue:+-i "$defvalue"} value
+        read -e -p $'\033[34m  New value for target attribute:\033[0m ' ${defvalue:+-i "$defvalue"} value
       fi
-  elif [[ "$action" == "delete" || "$action" == "d" ]]; then
-    # Prompt for attribute key name for delete action
-      if [[ -z "$key" ]]; then
-	  read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} key
-      fi
+    fi
   fi
 
   # Iterate over each row in the CSV file
@@ -324,7 +321,7 @@ interact() {
 
 	    elif [[ "$action" == "get" || "$action" == "g" ]]; then
 		# Build the GET URL
-		get_url="https://${domain}:443/api/plugins/telemetry/DEVICE/$deviceid/values/attributes/${scope}_SCOPE"
+		get_url="https://${domain}:443/api/plugins/telemetry/DEVICE/$deviceid/values/attributes/${scope}_SCOPE${key:+?keys=$key}"
 
 		# Execute the curl command for get
 		response=$(curl -s -X GET \
