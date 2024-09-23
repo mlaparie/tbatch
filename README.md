@@ -2,7 +2,7 @@
 
 The free Thingsboard plan (Community Edition) does not make it easy to download full datasets remotely, nor does it provide user-friendly tools to manipulate device attributes in batch to change the behaviour of multiple devices at once. To work around these limitations, `tbatch` allows programmatically downloading data or editing attributes:
 
-``` sh
+```
 Interact with the ThingsBoard API for managing telemetry attributes and fetching data in batch.
 
 Usage: ./tbatch [options]
@@ -32,7 +32,7 @@ Options:
 
 This script supports running actions on subsets of devices without independently from the Thingsboard frontend: just add tags to devices in the CSV file that lists `Device IDs` (which can be generated with `./tbatch --action inventory`) and then use target tags in the script. Below is an example showing interactive mode to fetch raw data from all devices with the `demo` tag:
 
-``` sh
+```
 $ ./tbatch
 - Enter your Thingsboard URL: iot.pclim.net
 - Enter your login email: tenant@inrae.fr
