@@ -19,6 +19,7 @@ show_help() {
     echo "  -s, --scope SCOPE        Scope of the target attribute: server or shared (default: shared)"
     echo "  -k, --key KEY            Target attribute key name (for post/delete actions)"
     echo "  -v, --value VALUE        New value for target attribute (for post action)"
+    echo "  -g, --get-style STYLE    Print style for the get action: csv, tsv, or detailed (default: detailed)"
     echo "  -o, --output FOLDER      Output folder for fetched data (default: ./data/)"
     echo "  -c, --config FILE        Use custom config file"
     echo "  -q, --quit               Run once then quit instead of prompting for new actions (only place this flag at the end of the command)"
@@ -54,6 +55,7 @@ while [[ "$#" -gt 0 ]]; do
         -s|--scope) scope="$2"; shift ;;
 	-k|--key) key="$2"; shift ;;
 	-v|--value) value="$2"; shift ;;
+	-g|--get-style) getstyle="$2" shift ;; 
 	-o|--output) output="$2"; shift ;;
 	-c|--config) config_file="$2"; shift ;;
 	-q|--quit) quit="true"; shift ;;
@@ -96,6 +98,9 @@ tags=""
 
 # Comma-separated list of devices (do not use "*" for wild card, this is only supported with the --labels flag at runtime)
 labels=""
+
+# Print style for the get action: csv, tsv, or detailed
+getstyle=""
 
 # Customer ID hash; this is not the customer name, but the ID that one can copy in the Thingsboard settings from a tenant account
 customerid=""
@@ -266,6 +271,9 @@ interact() {
         read -e -p $'\033[34m  New value for target attribute:\033[0m ' ${defvalue:+-i "$defvalue"} value
       fi
     fi
+    if [[ "$action" == "get" || "$action" == "g" ]] && [[ -z "$getstyle" ]]; then
+      read -e -p $'\033[34m  Set print style: tsv/csv/detailed (default):\033[0m ' ${defgetstyle:+-i "$defgetstyle"} getstyle
+    fi
   fi
 
   # Iterate over each row in the CSV file
@@ -331,10 +339,16 @@ interact() {
 
 		# Print the retrieved attributes in a formatted way
 		if [[ "$response" != "null" && "$response" != "" ]]; then
-		    formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[37m\1\x1b[0m: \x1b[33m\2\x1b[0m/' | awk '{printf "%s; ", $0} END {printf "\n"}' | sed 's/; $//')
+                  formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[37m\1\x1b[0m: \x1b[33m\2\x1b[0m/' | awk '{printf "%s; ", $0} END {printf "\n"}' | sed 's/; $//')
+		  if [[ "$getstyle" == "csv" ]]; then
+		    echo -e "\033[36m$deviceid\033[0m,\033[36m$label\033[0m,\033[35m${tag^^}\033[0m,$formatted_attributes"
+		  elif [[ "$getstyle" == "tsv" ]]; then
+		    echo -e "\033[36m$deviceid\033[0m,\033[36m$label\033[0m,\033[35m${tag^^}\033[0m,$formatted_attributes" | column -t -s ',' -o '  '
+		  else
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mCurrent ${scope}_SCOPE attributes:\0033[0m\n      $formatted_attributes"
+		  fi
 		else
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to get ${scope}_SCOPE attributes\033[0m"
+		  echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to get ${scope}_SCOPE attributes\033[0m"
 		fi
 
  	    elif [[ "$action" == "fetch" || "$action" == "f" ]]; then
