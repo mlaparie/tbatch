@@ -364,6 +364,9 @@ while true; do
 
   # Prompt user to continue or exit
   if [[ -z "$quit" ]]; then
+    if [[ "$defquit" == "y" ]]; then # We need that because the question actually asks whether to continue, not to quit
+      defquit="n"
+    fi
     read -e -p $'\033[34m- Execute a new action? (Y/n):\033[0m ' ${defquit:+-i "$defquit"} continue_choice
     if [[ "$continue_choice" = "n" ]]; then
       echo "Exiting…"
