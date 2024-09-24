@@ -17,8 +17,8 @@ show_help() {
     echo '  -t, --tags TAG(S)        Target device tag(s) (comma-separated, or "*")'
     echo '  -l, --labels LABEL(S)    Target device label(s) (comma-separated, or "*")'
     echo "  -s, --scope SCOPE        Scope of the target attribute: server or shared (default: shared)"
-    echo "  -k, --key KEY            Target attribute key name(s) (for post/delete/get actions, comma-separated if multiple)"
-    echo "  -v, --value VALUE        New value(s) for target attribute(s) (for post action, comma-separated if multiple)"
+    echo "  -k, --keys KEY(S)        Target attribute key name(s) (for post/delete/get actions, comma-separated if multiple)"
+    echo "  -v, --values VALUE(S)    New value(s) for target attribute(s) (for post action, comma-separated if multiple)"
     echo "  -g, --get-style STYLE    Print style for the get action: csv, tsv, or detailed (default: detailed)"
     echo "  -o, --output FOLDER      Output folder for fetched data (default: ./data/)"
     echo "  -c, --config FILE        Use custom config file"
@@ -53,9 +53,9 @@ while [[ "$#" -gt 0 ]]; do
         -t|--tags|--tag) tag_selection="$2"; shift ;;
         -l|--labels|--label) label_selection="$2"; shift ;;
         -s|--scope) scope="$2"; shift ;;
-	-k|--key) key="$2"; shift ;;
-	-v|--value) value="$2"; shift ;;
-	-g|--get-style) getstyle="$2" shift ;; 
+	-k|--keys|--key) keys="$2"; shift ;;
+	-v|--values|--value) values="$2"; shift ;;
+	-g|--get-style|--getstyle) getstyle="$2"; shift ;; 
 	-o|--output) output="$2"; shift ;;
 	-c|--config) config_file="$2"; shift ;;
 	-q|--quit) quit="true"; shift ;;
@@ -73,7 +73,7 @@ if [[ ! -f "$config_file" ]]; then
     read -p $'\033[34mConfiguration file not found. Generate configuration template? (Y/n): \033[0m' config_reply
     if ! [[ "$config_reply" == "n" ]]; then
 	cat > "$config_file" <<EOL
-# Set default prompt values below to prefill the interactive prompts (or leave empty)
+# Set default prompt answers below to prefill the interactive prompts (or leave empty)
 # This configuration is ignored when running the script non-interctively, but all
 # options below can be set at runtime with flags.
 
@@ -109,10 +109,10 @@ customerid=""
 quit=""
 
 # Target attribute key name(s) (for post/delete/get actions, comma-separated if multiple)
-key=""
+keys=""
 
 # New value(s) for target attribute(s) (for post action, comma-separated if multiple)
-value=""
+values=""
 EOL
 	echo "Configuration template created in '$config_file', go edit it!"
 	exit 0
@@ -262,13 +262,13 @@ interact() {
   fi
 
   if [[ "$action" != "inventory" && "$action" != "i" && "$action" != "fetch" && "$action" != "f" ]]; then
-    # Prompt for attribute and value for post action
-    if [[ -z "$key" ]]; then
-      read -e -p $'\033[34m  Target attribute key name(s) (comma-separated if multiple, or leave blank):\033[0m ' ${defkey:+-i "$defkey"} key
+    # Prompt for attributes and values for post action
+    if [[ -z "$keys" ]]; then
+      read -e -p $'\033[34m  Target attribute key name(s) (comma-separated if multiple, or leave blank):\033[0m ' ${defkeys:+-i "$defkeys"} keys
     fi
     if [[ "$action" == "post" || "$action" == "p" ]]; then
-      if [[ -z "$value" ]]; then
-        read -e -p $'\033[34m  New value(s) for target attribute(s) (comma-separated if multiple):\033[0m ' ${defvalue:+-i "$defvalue"} value
+      if [[ -z "$values" ]]; then
+        read -e -p $'\033[34m  New value(s) for target attribute(s) (comma-separated if multiple):\033[0m ' ${defvalues:+-i "$defvalues"} values
       fi
     fi
     if [[ "$action" == "get" || "$action" == "g" ]] && [[ -z "$getstyle" ]]; then
@@ -295,8 +295,8 @@ interact() {
 		post_url="https://${domain}:443/api/plugins/telemetry/${deviceid}/${scope}_SCOPE"
 
 		# Convert comma-separated keys and values into arrays
-		IFS=',' read -r -a key_array <<< "$key"
-		IFS=',' read -r -a value_array <<< "$value"
+		IFS=',' read -r -a key_array <<< "$keys"
+		IFS=',' read -r -a value_array <<< "$values"
 
 		# Ensure the number of keys and values match
 		if [[ ${#key_array[@]} -ne ${#value_array[@]} ]]; then
@@ -327,12 +327,12 @@ interact() {
 		if [[ "$response" == "200" ]]; then
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mPosted '\033[0m$(echo ${json_payload:1:-1} | sed 's/"//g' | sed 's/: /=\x1b[33m/g' | sed 's/,/\x1b[0m,/g')\033[32m'"
 		else
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed\033[0m to post '\033[32m$key: $value\033[31m' (HTTP Code: $response)\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed\033[0m to post '\033[32m$keys: $values\033[31m' (HTTP Code: $response)\033[0m"
 		fi
 
 	    elif [[ "$action" == "delete" || "$action" == "d" ]]; then
 		# Build the DELETE URL
-		delete_url="https://${domain}:443/api/plugins/telemetry/$deviceid/${scope}_SCOPE?keys=$key"
+		delete_url="https://${domain}:443/api/plugins/telemetry/$deviceid/${scope}_SCOPE?keys=$keys"
 
 		# Make the DELETE request
 		response=$(curl -X 'DELETE' \
@@ -343,14 +343,14 @@ interact() {
 
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mDeleted '\033[0m$(echo $key | sed 's/,/, /g')\033[32m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mDeleted '\033[0m$(echo $keys | sed 's/,/, /g')\033[32m'\033[0m"
 		else
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to delete '\033[0m$key\033[31m' (HTTP Code: $response)\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to delete '\033[0m$keys\033[31m' (HTTP Code: $response)\033[0m"
 		fi
 
 	    elif [[ "$action" == "get" || "$action" == "g" ]]; then
 		# Build the GET URL
-		get_url="https://${domain}:443/api/plugins/telemetry/DEVICE/$deviceid/values/attributes/${scope}_SCOPE${key:+?keys=$key}"
+		get_url="https://${domain}:443/api/plugins/telemetry/DEVICE/$deviceid/values/attributes/${scope}_SCOPE${keys:+?keys=$keys}"
 
 		# Execute the curl command for get
 		response=$(curl -s -X GET \
