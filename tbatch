@@ -17,8 +17,8 @@ show_help() {
     echo '  -t, --tags TAG(S)        Target device tag(s) (comma-separated, or "*")'
     echo '  -l, --labels LABEL(S)    Target device label(s) (comma-separated, or "*")'
     echo "  -s, --scope SCOPE        Scope of the target attribute: server or shared (default: shared)"
-    echo "  -k, --key KEY            Target attribute key name (for post/delete actions)"
-    echo "  -v, --value VALUE        New value for target attribute (for post action)"
+    echo "  -k, --key KEY            Target attribute key name (for post/delete/get actions, comma-separated if multiple)"
+    echo "  -v, --value VALUE        New value for target attribute (for post action, comma-separated if multiple)"
     echo "  -g, --get-style STYLE    Print style for the get action: csv, tsv, or detailed (default: detailed)"
     echo "  -o, --output FOLDER      Output folder for fetched data (default: ./data/)"
     echo "  -c, --config FILE        Use custom config file"
@@ -108,10 +108,10 @@ customerid=""
 # Run the script once and quit: y/n
 quit=""
 
-# Target attribute key name (for post/delete/get actions)
+# Target attribute key name(s) (for post/delete/get actions, comma-separated if multiple)
 key=""
 
-# New value for target attribute (for post action)
+# New value for target attribute(s) (for post action, comma-separated if multiple)
 value=""
 EOL
 	echo "Configuration template created in '$config_file', go edit it!"
@@ -291,20 +291,49 @@ interact() {
 	if [[ ${#selected_labels[@]} -eq 0 || " ${selected_labels[@]} " =~ " $label " ]]; then
 
 	    if [[ "$action" == "post" || "$action" == "p" ]]; then
-		# Build the POST URL
+	    # 	# Build the POST URL
 		post_url="https://${domain}:443/api/plugins/telemetry/${deviceid}/${scope}_SCOPE"
 		
+	    # 	# Execute the curl command for post
+	    # 	response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+	    # 			"$post_url" \
+	    # 			-H "accept: application/json" \
+	    # 			-H "Content-Type: application/json" \
+	    # 			-H "X-Authorization: Bearer ${AUTH_TOKEN}" \
+	    # 			-d "{\"${key}\": ${value}}")
+
+		# Convert comma-separated keys and values into arrays
+		IFS=',' read -r -a key_array <<< "$key"
+		IFS=',' read -r -a value_array <<< "$value"
+
+		# Ensure the number of keys and values match
+		if [[ ${#key_array[@]} -ne ${#value_array[@]} ]]; then
+		    echo "Error: Numbers of keys and values do not match."
+		    exit 1
+		fi
+
+		# Construct the JSON string
+		json_payload="{"
+		for i in "${!key_array[@]}"; do
+		    json_payload+="\"${key_array[$i]}\": ${value_array[$i]}"
+		    # Add a comma unless it's the last item
+		    if [[ $i -lt $((${#key_array[@]} - 1)) ]]; then
+			json_payload+=", "
+		    fi
+		done
+		json_payload+="}"
+
 		# Execute the curl command for post
 		response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
 				"$post_url" \
 				-H "accept: application/json" \
 				-H "Content-Type: application/json" \
 				-H "X-Authorization: Bearer ${AUTH_TOKEN}" \
-				-d "{\"${key}\": ${value}}")
-
+				-d "$json_payload")
+	    
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mPosted '\033[0m$key: $value\033[32m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mPosted '\033[0m$(echo ${json_payload:1:-1} | sed 's/"//g' | sed 's/: /=\x1b[33m/g' | sed 's/,/\x1b[0m,/g')\033[32m'"
 		else
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed\033[0m to post '\033[32m$key: $value\033[31m' (HTTP Code: $response)\033[0m"
 		fi
@@ -322,7 +351,7 @@ interact() {
 
 		# Print results based on HTTP response
 		if [[ "$response" == "200" ]]; then
-		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mDeleted '\033[0m$key\033[31m'\033[0m"
+		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mDeleted '\033[0m$(echo $key | sed 's/,/, /g')\033[32m'\033[0m"
 		else
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[31mFailed to delete '\033[0m$key\033[31m' (HTTP Code: $response)\033[0m"
 		fi
@@ -339,12 +368,13 @@ interact() {
 
 		# Print the retrieved attributes in a formatted way
 		if [[ "$response" != "null" && "$response" != "" ]]; then
-                  formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[37m\1\x1b[0m: \x1b[33m\2\x1b[0m/' | awk '{printf "%s; ", $0} END {printf "\n"}' | sed 's/; $//')
+                  formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[37m\1\x1b[0m=\x1b[33m\2\x1b[0m/' | awk '{printf "%s,", $0} END {printf "\n"}' | sed 's/,$//')
 		  if [[ "$getstyle" == "csv" ]]; then
 		    echo -e "\033[36m$deviceid\033[0m,\033[36m$label\033[0m,\033[35m${tag^^}\033[0m,$formatted_attributes"
 		  elif [[ "$getstyle" == "tsv" ]]; then
 		    echo -e "\033[36m$deviceid\033[0m,\033[36m$label\033[0m,\033[35m${tag^^}\033[0m,$formatted_attributes" | column -t -s ',' -o '  '
 		  else
+                    formatted_attributes=$(echo "$response" | jq -r '.[] | "\(.key): \(.value)"' | sed 's/\([^:]*\): \(.*\)/\x1b[37m\1\x1b[0m=\x1b[33m\2\x1b[0m/' | awk '{printf "%s; ", $0} END {printf "\n"}' | sed 's/; $//')
 		    echo -e "\033[36m$label ($deviceid)\033[0m \033[35m[${tag^^}]\033[0m - \033[32mCurrent ${scope}_SCOPE attributes:\0033[0m\n      $formatted_attributes"
 		  fi
 		else
