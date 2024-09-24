@@ -17,8 +17,8 @@ show_help() {
     echo '  -t, --tags TAG(S)        Target device tag(s) (comma-separated, or "*")'
     echo '  -l, --labels LABEL(S)    Target device label(s) (comma-separated, or "*")'
     echo "  -s, --scope SCOPE        Scope of the target attribute: server or shared (default: shared)"
-    echo "  -k, --key KEY            Target attribute key name (for post/delete/get actions, comma-separated if multiple)"
-    echo "  -v, --value VALUE        New value for target attribute (for post action, comma-separated if multiple)"
+    echo "  -k, --key KEY            Target attribute key name(s) (for post/delete/get actions, comma-separated if multiple)"
+    echo "  -v, --value VALUE        New value(s) for target attribute(s) (for post action, comma-separated if multiple)"
     echo "  -g, --get-style STYLE    Print style for the get action: csv, tsv, or detailed (default: detailed)"
     echo "  -o, --output FOLDER      Output folder for fetched data (default: ./data/)"
     echo "  -c, --config FILE        Use custom config file"
@@ -111,7 +111,7 @@ quit=""
 # Target attribute key name(s) (for post/delete/get actions, comma-separated if multiple)
 key=""
 
-# New value for target attribute(s) (for post action, comma-separated if multiple)
+# New value(s) for target attribute(s) (for post action, comma-separated if multiple)
 value=""
 EOL
 	echo "Configuration template created in '$config_file', go edit it!"
@@ -264,11 +264,11 @@ interact() {
   if [[ "$action" != "inventory" && "$action" != "i" && "$action" != "fetch" && "$action" != "f" ]]; then
     # Prompt for attribute and value for post action
     if [[ -z "$key" ]]; then
-      read -e -p $'\033[34m  Target attribute key name:\033[0m ' ${defkey:+-i "$defkey"} key
+      read -e -p $'\033[34m  Target attribute key name(s) (comma-separated if multiple, or leave blank):\033[0m ' ${defkey:+-i "$defkey"} key
     fi
     if [[ "$action" == "post" || "$action" == "p" ]]; then
       if [[ -z "$value" ]]; then
-        read -e -p $'\033[34m  New value for target attribute:\033[0m ' ${defvalue:+-i "$defvalue"} value
+        read -e -p $'\033[34m  New value(s) for target attribute(s) (comma-separated if multiple):\033[0m ' ${defvalue:+-i "$defvalue"} value
       fi
     fi
     if [[ "$action" == "get" || "$action" == "g" ]] && [[ -z "$getstyle" ]]; then
@@ -291,16 +291,8 @@ interact() {
 	if [[ ${#selected_labels[@]} -eq 0 || " ${selected_labels[@]} " =~ " $label " ]]; then
 
 	    if [[ "$action" == "post" || "$action" == "p" ]]; then
-	    # 	# Build the POST URL
+	    	# Build the POST URL
 		post_url="https://${domain}:443/api/plugins/telemetry/${deviceid}/${scope}_SCOPE"
-		
-	    # 	# Execute the curl command for post
-	    # 	response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-	    # 			"$post_url" \
-	    # 			-H "accept: application/json" \
-	    # 			-H "Content-Type: application/json" \
-	    # 			-H "X-Authorization: Bearer ${AUTH_TOKEN}" \
-	    # 			-d "{\"${key}\": ${value}}")
 
 		# Convert comma-separated keys and values into arrays
 		IFS=',' read -r -a key_array <<< "$key"
@@ -308,7 +300,7 @@ interact() {
 
 		# Ensure the number of keys and values match
 		if [[ ${#key_array[@]} -ne ${#value_array[@]} ]]; then
-		    echo "Error: Numbers of keys and values do not match."
+		    echo "Error: Lists of keys and values must be the same length."
 		    exit 1
 		fi
 
@@ -406,9 +398,11 @@ while true; do
   # Prompt user to continue or exit
   if [[ -z "$quit" ]]; then
     if [[ "$defquit" == "y" ]]; then # We need that because the question actually asks whether to continue, not to quit
-      defquit="n"
+	continue="n"
+    else
+	continue="y"
     fi
-    read -e -p $'\033[34m- Execute a new action? (Y/n):\033[0m ' ${defquit:+-i "$defquit"} continue_choice
+    read -e -p $'\033[34m- Execute a new action? (Y/n):\033[0m ' ${continue:+-i "$continue"} continue_choice
     if [[ "$continue_choice" = "n" ]]; then
       echo "Exiting…"
       exit 0
