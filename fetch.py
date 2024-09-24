@@ -1,3 +1,5 @@
+# This Python script was modified from https://github.com/oats-center/tb-exporter, commit 4813d00.
+
 import sys
 import os
 import argparse
