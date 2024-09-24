@@ -16,8 +16,9 @@ Options:
   -t, --tags TAG(S)        Target device tag(s) (comma-separated, or "*")
   -l, --labels LABEL(S)    Target device label(s) (comma-separated, or "*")
   -s, --scope SCOPE        Scope of the target attribute: server or shared (default: shared)
-  -k, --key KEY            Target attribute key name (for post/delete actions)
-  -v, --value VALUE        New value for target attribute (for post action)
+  -k, --keys KEY(S)        Target attribute key name(s) (for post/delete/get actions, comma-separated if multiple)
+  -v, --values VALUE(S)    New value(s) for target attribute(s) (for post action, comma-separated if multiple)
+  -g, --get-style STYLE    Print style for the get action: csv, tsv, or detailed (default: detailed)
   -o, --output FOLDER      Output folder for fetched data (default: ./data/)
   -c, --config FILE        Use custom config file
   -q, --quit               Run once then quit instead of prompting for new actions (only place this flag at the end of the command)
