@@ -31,7 +31,7 @@ Options:
 
 ## Usage
 
-This script supports running actions on subsets of devices without independently from the Thingsboard frontend: just add tags to devices in the CSV file that lists `Device IDs` (which can be generated with `./tbatch --action inventory`) and then use target tags in the script. Below is an example showing interactive mode to fetch raw data from all devices with the `demo` tag:
+This script supports running actions on subsets of devices independently from the Thingsboard frontend: just add tags to devices in the CSV file that lists `Device IDs` (which can be generated with `./tbatch --action inventory`) and then use target tags in the script. Below is an example showing interactive mode to fetch raw data from all devices with the `demo` tag:
 
 ```
 $ ./tbatch
@@ -81,3 +81,7 @@ data/
 ```
 
 The script can also be run fully non-interactively using runtime flags to automate its execution in a cronjob or other routine.
+
+## License
+
+GNU AGPLv3
