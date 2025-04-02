@@ -1,4 +1,5 @@
 # This Python script was modified from https://github.com/oats-center/tb-exporter, commit 4813d00.
+# All credits to them for fetch.py!
 
 import sys
 import os
